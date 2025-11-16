@@ -1,0 +1,5 @@
+# Dependencias del agente update_repositories
+python-dotenv==1.0.0
+PyGithub==2.1.1
+GitPython==3.1.40
+

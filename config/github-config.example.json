@@ -1,0 +1,18 @@
+{
+  "organization": "trinityweb",
+  "repositories": [
+    "saas-mt-marketplace-admin",
+    "saas-mt-marketplace-frontend",
+    "mcp-go-generator-node",
+    "mcp-trello-tracking",
+    "documentation"
+  ],
+  "local_paths": {
+    "saas-mt-marketplace-admin": "../marketplace-admin",
+    "saas-mt-marketplace-frontend": "../marketplace-frontend",
+    "mcp-go-generator-node": "../mcp-go-generator-node",
+    "mcp-trello-tracking": "../mcp-trello-tracking",
+    "documentation": "../documentation"
+  }
+}
+

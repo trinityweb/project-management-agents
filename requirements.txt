@@ -1,0 +1,3 @@
+# Dependencias compartidas base
+python-dotenv==1.0.0
+

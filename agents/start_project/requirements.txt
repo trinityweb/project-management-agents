@@ -1,0 +1,3 @@
+# Dependencias del agente start_project
+python-dotenv==1.0.0
+
