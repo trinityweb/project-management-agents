@@ -424,23 +424,153 @@ class UpdateRepositoriesAgent:
             self.logger.error(f"{repo_path.name}: Error al inicializar repositorio: {e}")
             return False
     
-    def create_github_repo(self, repo_name: str, org_name: str = "trinityweb", 
-                          description: str = "", private: bool = False) -> Dict[str, Any]:
+    def create_github_repo_with_gh_cli(self, repo_name: str, org_name: str = "trinityweb",
+                                       description: str = "", private: bool = False,
+                                       dry_run: bool = False) -> Dict[str, Any]:
         """
-        Crea un repositorio en GitHub si no existe.
+        Crea un repositorio en GitHub usando GitHub CLI (gh) que usa la misma autenticación que Git.
         
         Args:
             repo_name: Nombre del repositorio
             org_name: Nombre de la organización
             description: Descripción del repositorio
             private: Si el repositorio es privado
+            dry_run: Si es True, solo simula la operación
             
         Returns:
             Diccionario con información del repositorio creado o None si falla
         """
+        if dry_run:
+            self.logger.info(f"[DRY RUN] Crear repositorio {org_name}/{repo_name} con gh CLI")
+            return {
+                "name": repo_name,
+                "full_name": f"{org_name}/{repo_name}",
+                "url": f"https://github.com/{org_name}/{repo_name}",
+                "clone_url": f"https://github.com/{org_name}/{repo_name}.git"
+            }
+        
+        try:
+            # Verificar si gh está instalado
+            from shared.utils import run_command
+            returncode, _, _ = run_command(["gh", "--version"], check=False, capture_output=True)
+            if returncode != 0:
+                return None
+            
+            # Verificar si el repositorio ya existe
+            returncode, stdout, stderr = run_command(
+                ["gh", "repo", "view", f"{org_name}/{repo_name}"],
+                check=False,
+                capture_output=True
+            )
+            if returncode == 0:
+                # El repositorio ya existe
+                self.logger.info(f"Repositorio {repo_name} ya existe en GitHub")
+                return {
+                    "name": repo_name,
+                    "full_name": f"{org_name}/{repo_name}",
+                    "url": f"https://github.com/{org_name}/{repo_name}",
+                    "clone_url": f"https://github.com/{org_name}/{repo_name}.git"
+                }
+            
+            # Crear el repositorio
+            # Necesitamos ejecutar desde el directorio del repositorio
+            agents_dir = self.project_root / "agents" / "project-management-agents"
+            if not agents_dir.exists():
+                return None
+            
+            self.logger.info(f"Creando repositorio {repo_name} en GitHub usando gh CLI...")
+            visibility = "private" if private else "public"
+            cmd = [
+                "gh", "repo", "create", f"{org_name}/{repo_name}",
+                "--description", description or f"Repositorio {repo_name}",
+                "--visibility", visibility,
+                "--source", str(agents_dir),
+                "--remote", "origin",  # Configurar como remoto origin
+                "--push"  # Hacer push del contenido
+            ]
+            
+            returncode, stdout, stderr = run_command(
+                cmd, 
+                cwd=agents_dir,
+                check=False, 
+                capture_output=True
+            )
+            if returncode == 0:
+                self.logger.info(f"✅ Repositorio {repo_name} creado en GitHub y contenido subido")
+                return {
+                    "name": repo_name,
+                    "full_name": f"{org_name}/{repo_name}",
+                    "url": f"https://github.com/{org_name}/{repo_name}",
+                    "clone_url": f"https://github.com/{org_name}/{repo_name}.git"
+                }
+            else:
+                # Si falla con --push, intentar sin push
+                self.logger.debug(f"Error al crear con push: {stderr}")
+                cmd_no_push = [
+                    "gh", "repo", "create", f"{org_name}/{repo_name}",
+                    "--description", description or f"Repositorio {repo_name}",
+                    "--visibility", visibility,
+                    "--source", str(agents_dir),
+                    "--remote", "origin"
+                ]
+                returncode2, stdout2, stderr2 = run_command(
+                    cmd_no_push,
+                    cwd=agents_dir,
+                    check=False,
+                    capture_output=True
+                )
+                if returncode2 == 0:
+                    self.logger.info(f"✅ Repositorio {repo_name} creado en GitHub (sin push inicial)")
+                    return {
+                        "name": repo_name,
+                        "full_name": f"{org_name}/{repo_name}",
+                        "url": f"https://github.com/{org_name}/{repo_name}",
+                        "clone_url": f"https://github.com/{org_name}/{repo_name}.git"
+                    }
+                else:
+                    self.logger.debug(f"Error al crear con gh CLI: {stderr2}")
+                    return None
+        
+        except Exception as e:
+            self.logger.debug(f"Error al usar gh CLI: {e}")
+            return None
+    
+    def create_github_repo(self, repo_name: str, org_name: str = "trinityweb", 
+                          description: str = "", private: bool = False,
+                          dry_run: bool = False) -> Dict[str, Any]:
+        """
+        Crea un repositorio en GitHub si no existe.
+        Intenta usar GitHub CLI primero (usa la misma autenticación que Git),
+        luego intenta con la API si hay token configurado.
+        
+        Args:
+            repo_name: Nombre del repositorio
+            org_name: Nombre de la organización
+            description: Descripción del repositorio
+            private: Si el repositorio es privado
+            dry_run: Si es True, solo simula la operación
+            
+        Returns:
+            Diccionario con información del repositorio creado o None si falla
+        """
+        # 1. Intentar con GitHub CLI (usa la misma autenticación que Git)
+        repo_info = self.create_github_repo_with_gh_cli(
+            repo_name=repo_name,
+            org_name=org_name,
+            description=description,
+            private=private,
+            dry_run=dry_run
+        )
+        if repo_info:
+            return repo_info
+        
+        # 2. Si gh CLI no está disponible, intentar con API (requiere token)
         if not self.github_client:
-            self.logger.info("GitHub client no disponible - no se puede crear repositorio en GitHub")
+            self.logger.info("GitHub CLI no disponible y GitHub client no configurado")
             self.logger.info("El repositorio local se puede usar normalmente, solo no estará en GitHub")
+            self.logger.info("Para crear en GitHub:")
+            self.logger.info("  - Instala GitHub CLI: brew install gh (macOS) o https://cli.github.com/")
+            self.logger.info("  - O configura GITHUB_TOKEN en .env")
             return None
         
         try:
@@ -453,7 +583,16 @@ class UpdateRepositoriesAgent:
                 # El repositorio no existe, intentar crearlo
                 self.logger.debug(f"Repositorio no encontrado en GitHub: {e}")
             
-            self.logger.info(f"Creando repositorio {repo_name} en GitHub...")
+            if dry_run:
+                self.logger.info(f"[DRY RUN] Crear repositorio {org_name}/{repo_name} con GitHub API")
+                return {
+                    "name": repo_name,
+                    "full_name": f"{org_name}/{repo_name}",
+                    "url": f"https://github.com/{org_name}/{repo_name}",
+                    "clone_url": f"https://github.com/{org_name}/{repo_name}.git"
+                }
+            
+            self.logger.info(f"Creando repositorio {repo_name} en GitHub usando API...")
             repo_info = self.github_client.create_repo(
                 name=repo_name,
                 org_name=org_name,
@@ -468,8 +607,8 @@ class UpdateRepositoriesAgent:
             if "401" in error_msg or "Bad credentials" in error_msg:
                 self.logger.warning(f"⚠️  No se pudo crear repositorio en GitHub: Token inválido o no configurado")
                 self.logger.info("   El repositorio local funciona normalmente. Para crear en GitHub:")
-                self.logger.info("   1. Obtén un token en: https://github.com/settings/tokens")
-                self.logger.info("   2. Agrégalo a .env como GITHUB_TOKEN=tu_token")
+                self.logger.info("   1. Instala GitHub CLI: brew install gh (usa tu autenticación Git)")
+                self.logger.info("   2. O configura GITHUB_TOKEN en .env")
             elif "403" in error_msg or "Forbidden" in error_msg:
                 self.logger.warning(f"⚠️  No se pudo crear repositorio en GitHub: Permisos insuficientes")
                 self.logger.info("   Verifica que el token tenga permisos 'repo' y 'write:org'")
@@ -715,7 +854,8 @@ class UpdateRepositoriesAgent:
             repo_name=repo_name,
             org_name="trinityweb",
             description="Agentes de AI para gestión automatizada del proyecto SaaS Multi-Tenant",
-            private=False
+            private=False,
+            dry_run=dry_run
         )
         
         if repo_info and not dry_run:
