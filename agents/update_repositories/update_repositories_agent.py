@@ -858,15 +858,20 @@ class UpdateRepositoriesAgent:
         # Verificar si el remoto ya está configurado
         repo = Repo(agents_dir)
         remote_configured = False
+        org_name = "trinityweb"
         try:
-            origin = repo.remote("origin")
-            if origin.exists():
-                remote_url = list(origin.urls)[0] if origin.urls else ""
-                if remote_url and (f"{org_name}/{repo_name}" in remote_url or repo_name in remote_url):
-                    self.logger.info(f"Remoto 'origin' ya está configurado: {remote_url}")
-                    remote_configured = True
-        except Exception:
-            pass
+            if "origin" in [r.name for r in repo.remotes]:
+                origin = repo.remote("origin")
+                remote_urls = list(origin.urls) if origin.urls else []
+                if remote_urls:
+                    remote_url = remote_urls[0]
+                    # Verificar si el remoto apunta al repositorio correcto
+                    if remote_url and (f"{org_name}/{repo_name}" in remote_url or repo_name in remote_url):
+                        self.logger.info(f"Remoto 'origin' ya está configurado: {remote_url}")
+                        remote_configured = True
+                        return True  # Ya está todo configurado, no necesitamos crear nada
+        except Exception as e:
+            self.logger.debug(f"Error al verificar remoto: {e}")
         
         # Crear repositorio en GitHub solo si el remoto no está configurado
         if not remote_configured:
