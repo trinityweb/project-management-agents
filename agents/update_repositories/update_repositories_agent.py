@@ -855,27 +855,40 @@ class UpdateRepositoriesAgent:
             if not self.initialize_repo(agents_dir, dry_run=dry_run):
                 return False
         
-        # Crear repositorio en GitHub si no existe (opcional)
-        repo_info = self.create_github_repo(
-            repo_name=repo_name,
-            org_name="trinityweb",
-            description="Agentes de AI para gestión automatizada del proyecto SaaS Multi-Tenant",
-            private=False,
-            dry_run=dry_run
-        )
+        # Verificar si el remoto ya está configurado
+        repo = Repo(agents_dir)
+        remote_configured = False
+        try:
+            origin = repo.remote("origin")
+            if origin.exists():
+                remote_url = list(origin.urls)[0] if origin.urls else ""
+                if remote_url and (f"{org_name}/{repo_name}" in remote_url or repo_name in remote_url):
+                    self.logger.info(f"Remoto 'origin' ya está configurado: {remote_url}")
+                    remote_configured = True
+        except Exception:
+            pass
         
-        if repo_info and not dry_run:
-            # Configurar remoto si no existe
-            try:
-                repo = Repo(agents_dir)
-                if not repo.remotes:
-                    repo.create_remote('origin', repo_info['clone_url'])
-                    self.logger.info(f"✅ Remoto 'origin' configurado: {repo_info['clone_url']}")
-                elif repo.remotes.origin.url != repo_info['clone_url']:
-                    self.logger.info(f"Actualizando remoto 'origin' a: {repo_info['clone_url']}")
-                    repo.remotes.origin.set_url(repo_info['clone_url'])
-            except Exception as e:
-                self.logger.warning(f"Error al configurar remoto: {e}")
+        # Crear repositorio en GitHub solo si el remoto no está configurado
+        if not remote_configured:
+            repo_info = self.create_github_repo(
+                repo_name=repo_name,
+                org_name="trinityweb",
+                description="Agentes de AI para gestión automatizada del proyecto SaaS Multi-Tenant",
+                private=False,
+                dry_run=dry_run
+            )
+            
+            if repo_info and not dry_run:
+                # Configurar remoto si no existe
+                try:
+                    if not repo.remotes:
+                        repo.create_remote('origin', repo_info['clone_url'])
+                        self.logger.info(f"✅ Remoto 'origin' configurado: {repo_info['clone_url']}")
+                    elif repo.remotes.origin.url != repo_info['clone_url']:
+                        self.logger.info(f"Actualizando remoto 'origin' a: {repo_info['clone_url']}")
+                        repo.remotes.origin.set_url(repo_info['clone_url'])
+                except Exception as e:
+                    self.logger.warning(f"Error al configurar remoto: {e}")
         elif not repo_info and not dry_run:
             self.logger.info("ℹ️  El repositorio local está listo. Puedes configurarlo manualmente:")
             self.logger.info("   git remote add origin https://github.com/trinityweb/project-management-agents.git")
