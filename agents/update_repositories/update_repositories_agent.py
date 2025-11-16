@@ -481,11 +481,12 @@ class UpdateRepositoriesAgent:
                 return None
             
             self.logger.info(f"Creando repositorio {repo_name} en GitHub usando gh CLI...")
-            visibility = "private" if private else "public"
+            # Usar --public o --private según la versión de gh
+            visibility_flag = "--private" if private else "--public"
             cmd = [
                 "gh", "repo", "create", f"{org_name}/{repo_name}",
                 "--description", description or f"Repositorio {repo_name}",
-                "--visibility", visibility,
+                visibility_flag,
                 "--source", ".",
                 "--remote", "origin",  # Configurar como remoto origin
                 "--push"  # Hacer push del contenido
@@ -512,7 +513,7 @@ class UpdateRepositoriesAgent:
                 cmd_no_push = [
                     "gh", "repo", "create", f"{org_name}/{repo_name}",
                     "--description", description or f"Repositorio {repo_name}",
-                    "--visibility", visibility,
+                    visibility_flag,
                     "--source", ".",
                     "--remote", "origin"
                 ]
