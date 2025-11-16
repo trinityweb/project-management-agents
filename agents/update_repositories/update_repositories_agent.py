@@ -454,6 +454,7 @@ class UpdateRepositoriesAgent:
             from shared.utils import run_command
             returncode, _, _ = run_command(["gh", "--version"], check=False, capture_output=True)
             if returncode != 0:
+                self.logger.debug("GitHub CLI (gh) no está instalado")
                 return None
             
             # Verificar si el repositorio ya existe
@@ -476,6 +477,7 @@ class UpdateRepositoriesAgent:
             # Necesitamos ejecutar desde el directorio del repositorio
             agents_dir = self.project_root / "agents" / "project-management-agents"
             if not agents_dir.exists():
+                self.logger.debug(f"Directorio del repositorio no existe: {agents_dir}")
                 return None
             
             self.logger.info(f"Creando repositorio {repo_name} en GitHub usando gh CLI...")
@@ -484,14 +486,15 @@ class UpdateRepositoriesAgent:
                 "gh", "repo", "create", f"{org_name}/{repo_name}",
                 "--description", description or f"Repositorio {repo_name}",
                 "--visibility", visibility,
-                "--source", str(agents_dir),
+                "--source", ".",
                 "--remote", "origin",  # Configurar como remoto origin
                 "--push"  # Hacer push del contenido
             ]
             
+            # Ejecutar desde el directorio del repositorio
             returncode, stdout, stderr = run_command(
                 cmd, 
-                cwd=agents_dir,
+                cwd=str(agents_dir),  # Convertir Path a string
                 check=False, 
                 capture_output=True
             )
@@ -505,17 +508,17 @@ class UpdateRepositoriesAgent:
                 }
             else:
                 # Si falla con --push, intentar sin push
-                self.logger.debug(f"Error al crear con push: {stderr}")
+                self.logger.debug(f"Error al crear con push (código {returncode}): {stderr}")
                 cmd_no_push = [
                     "gh", "repo", "create", f"{org_name}/{repo_name}",
                     "--description", description or f"Repositorio {repo_name}",
                     "--visibility", visibility,
-                    "--source", str(agents_dir),
+                    "--source", ".",
                     "--remote", "origin"
                 ]
                 returncode2, stdout2, stderr2 = run_command(
                     cmd_no_push,
-                    cwd=agents_dir,
+                    cwd=str(agents_dir),
                     check=False,
                     capture_output=True
                 )
@@ -528,11 +531,13 @@ class UpdateRepositoriesAgent:
                         "clone_url": f"https://github.com/{org_name}/{repo_name}.git"
                     }
                 else:
-                    self.logger.debug(f"Error al crear con gh CLI: {stderr2}")
+                    self.logger.warning(f"Error al crear con gh CLI (código {returncode2}): {stderr2}")
                     return None
         
         except Exception as e:
             self.logger.debug(f"Error al usar gh CLI: {e}")
+            import traceback
+            self.logger.debug(traceback.format_exc())
             return None
     
     def create_github_repo(self, repo_name: str, org_name: str = "trinityweb", 
