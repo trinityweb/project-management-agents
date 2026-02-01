@@ -53,9 +53,13 @@ def run_command(command: List[str], cwd: Optional[Path] = None,
     logger.debug(f"Ejecutando comando: {' '.join(command)}")
     
     try:
+        # Convertir Path a string si es necesario
+        cwd_str = str(cwd) if cwd else None
+        logger.debug(f"Directorio de trabajo: {cwd_str}")
+        
         result = subprocess.run(
             command,
-            cwd=cwd,
+            cwd=cwd_str,
             check=check,
             capture_output=capture_output,
             text=True,

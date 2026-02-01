@@ -148,12 +148,43 @@ class StartProjectAgent:
             self.logger.warning(f"Error al iniciar frontends: {stderr}")
             return False
     
-    def run(self, start_frontends: bool = False) -> bool:
+    def start_docs(self) -> bool:
+        """
+        Inicia el proyecto de documentación con make docs.
+        
+        Returns:
+            True si se inició correctamente, False en caso contrario
+        """
+        self.logger.info("Iniciando documentación con 'make docs'...")
+        # Ejecutar en background ya que make docs es un proceso de larga duración
+        returncode, stdout, stderr = run_command(
+            ["make", "docs"],
+            cwd=self.project_root,
+            check=False,
+            capture_output=True
+        )
+        
+        if returncode == 0:
+            self.logger.info("Documentación iniciada correctamente")
+            if stdout:
+                self.logger.debug(stdout)
+            return True
+        else:
+            # Si el puerto está en uso, puede ser que ya esté corriendo
+            if "ya está en uso" in stderr or "already in use" in stderr.lower():
+                self.logger.info("Documentación ya está corriendo en el puerto 3006")
+                return True
+            self.logger.warning(f"Error al iniciar documentación: {stderr}")
+            return False
+    
+    def run(self, start_frontends: bool = True, start_docs: bool = True) -> bool:
         """
         Ejecuta la secuencia completa de inicio del proyecto.
+        Por defecto inicia los frontends y documentación siguiendo INICIO_RAPIDO.md.
         
         Args:
-            start_frontends: Si es True, también inicia los frontends
+            start_frontends: Si es True, también inicia los frontends (por defecto: True)
+            start_docs: Si es True, también inicia la documentación (por defecto: True)
             
         Returns:
             True si todo se ejecutó correctamente, False en caso contrario
@@ -179,10 +210,21 @@ class StartProjectAgent:
         if not self.check_status():
             self.logger.warning("Algunos servicios pueden no estar funcionando correctamente")
         
-        # 5. Opcionalmente iniciar frontends
+        # 5. Iniciar frontends (por defecto, siguiendo INICIO_RAPIDO.md paso 4)
         if start_frontends:
+            self.logger.info("Iniciando frontends (paso 4 de INICIO_RAPIDO.md)...")
             if not self.start_frontends():
                 self.logger.warning("Error al iniciar frontends, pero el backend está funcionando")
+        else:
+            self.logger.info("Omitiendo inicio de frontends")
+        
+        # 6. Iniciar documentación (opcional)
+        if start_docs:
+            self.logger.info("Iniciando documentación...")
+            if not self.start_docs():
+                self.logger.warning("Error al iniciar documentación, pero los demás servicios están funcionando")
+        else:
+            self.logger.info("Omitiendo inicio de documentación")
         
         self.logger.info("=" * 60)
         self.logger.info("Proceso de inicio completado")
@@ -197,15 +239,24 @@ def main():
         description="Inicia el proyecto siguiendo INICIO_RAPIDO.md"
     )
     parser.add_argument(
-        "--frontends",
+        "--no-frontends",
         action="store_true",
-        help="También inicia los frontends"
+        help="NO inicia los frontends (por defecto los inicia)"
+    )
+    parser.add_argument(
+        "--no-docs",
+        action="store_true",
+        help="NO inicia la documentación (por defecto la inicia)"
     )
     
     args = parser.parse_args()
     
     agent = StartProjectAgent()
-    success = agent.run(start_frontends=args.frontends)
+    # Por defecto inicia frontends y docs, a menos que se pasen los flags correspondientes
+    success = agent.run(
+        start_frontends=not args.no_frontends,
+        start_docs=not args.no_docs
+    )
     
     sys.exit(0 if success else 1)
 

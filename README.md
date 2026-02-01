@@ -9,7 +9,10 @@ Automatiza el proceso de inicio del proyecto siguiendo `INICIO_RAPIDO.md`:
 - Verifica/inicia Docker Desktop
 - Ejecuta `make lite-start` para iniciar el backend
 - Verifica el estado de los servicios
-- Opcionalmente inicia los frontends
+- Inicia los frontends (por defecto)
+- Inicia la documentación (por defecto)
+
+**Ver ayuda:** `./scripts/run_start_project.sh --help`
 
 ### 2. Actualizar Documentación (`update_documentation`)
 Mantiene la documentación del proyecto actualizada:
@@ -17,11 +20,28 @@ Mantiene la documentación del proyecto actualizada:
 - Valida documentación de repositorios
 - Sincroniza frontend de documentación
 
+**Ver ayuda:** `./scripts/run_update_docs.sh --help`
+
 ### 3. Actualizar Repositorios (`update_repositories`)
 Gestiona actualizaciones de repositorios Git:
 - Hace pull de cambios remotos
 - Hace push de commits locales
 - Detecta y reporta conflictos
+
+**Ver ayuda:** `./scripts/run_update_repos.sh --help`
+
+---
+
+## 🆘 Ayuda Rápida
+
+**Todos los agentes tienen ayuda integrada:**
+```bash
+./scripts/run_start_project.sh --help
+./scripts/run_update_docs.sh --help
+./scripts/run_update_repos.sh --help
+```
+
+**Ver guía completa de ayuda:** [HELP.md](HELP.md)
 
 ## 🚀 Instalación
 

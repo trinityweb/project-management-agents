@@ -83,18 +83,33 @@ class ConfigLoader:
         Returns:
             Path a la raíz del proyecto
         """
-        project_root = self.load_env("PROJECT_ROOT", None)
+        # Primero intentar desde variable de entorno
+        project_root = os.getenv("PROJECT_ROOT")
         if project_root:
-            return Path(project_root)
+            path = Path(project_root).expanduser().resolve()
+            if path.exists() and (path / "INICIO_RAPIDO.md").exists():
+                return path
         
-        # Intentar detectar automáticamente
-        current = Path(__file__).parent.parent.parent.parent
+        # Intentar detectar automáticamente desde la ubicación del módulo
+        # __file__ está en: agents/project-management-agents/shared/config_loader.py
+        # Necesitamos subir 3 niveles para llegar a saas-mt/
+        current = Path(__file__).parent.parent.parent.parent.resolve()
         if (current / "INICIO_RAPIDO.md").exists():
             return current
         
+        # Si no funciona, intentar desde el directorio actual de trabajo
+        cwd = Path.cwd().resolve()
+        # Si estamos en agents/project-management-agents, subir 2 niveles
+        if "agents" in cwd.parts and "project-management-agents" in cwd.parts:
+            # Buscar el directorio que contiene "agents" y "services"
+            for parent in cwd.parents:
+                if (parent / "INICIO_RAPIDO.md").exists() and (parent / "services").exists():
+                    return parent
+        
         raise ValueError(
             "No se pudo determinar PROJECT_ROOT. "
-            "Configura la variable de entorno PROJECT_ROOT o .env"
+            "Configura la variable de entorno PROJECT_ROOT en .env o "
+            "ejecuta desde el directorio raíz del proyecto saas-mt"
         )
     
     def get_github_token(self) -> str:
